@@ -1,0 +1,436 @@
+openapi: 3.0.3
+info:
+  description: Document Service REST API spec
+  title: cf.document-service
+  version: 1.0.0
+servers:
+- description: Local
+  url: http://localhost:3000/api/{version}
+  variables:
+    ServerDNS:
+      default: http://localhost:3000/api/{version}
+      enum:
+      - http://localhost:3000/api/{version}
+    version:
+      default: v1
+      enum:
+      - v1
+- description: Production
+  url: https://na.domain.com/{version}
+  variables:
+    ServerDNS:
+      default: https://na.domain.com/{version}
+      enum:
+      - https://na.domain.com/{version}
+      - https://eu.domain.com/{version}
+    version:
+      default: v1
+      enum:
+      - v1
+security:
+- BearerAuth: []
+paths:
+  /documents:
+    get:
+      description: Get Many Documents
+      operationId: getManyDocuments
+      parameters:
+      - in: query
+        name: country
+        schema:
+          type: string
+      - in: query
+        name: customerGid
+        schema:
+          type: string
+      - in: query
+        name: gid
+        schema:
+          type: string
+      - in: query
+        name: isSigned
+        schema:
+          type: string
+      - in: query
+        name: isValid
+        schema:
+          type: string
+      - in: query
+        name: language
+        schema:
+          type: string
+      - in: query
+        name: name
+        schema:
+          type: string
+      - in: query
+        name: opportunityGid
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+      - in: query
+        name: subtype
+        schema:
+          type: string
+      - in: query
+        name: type
+        schema:
+          type: string
+      - in: query
+        name: context
+        schema:
+          type: string
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: pageSize
+        schema:
+          type: integer
+      - in: query
+        name: sort
+        schema:
+          type: string
+      - in: query
+        name: sortBy
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiPortsGetManyDocumentsQuery'
+          description: OK
+      summary: Get Many Documents
+      tags:
+      - documents
+    post:
+      description: Create One Document
+      operationId: createOneOperationId
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiPortsCreateDocumentRequest'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiPortsCreateDocumentRequest'
+          description: OK
+      summary: Create One Document
+      tags:
+      - documents
+  /documents/{id}:
+    get:
+      description: Get One Document
+      operationId: getOneDocument
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          example: xxxx-xxxxx-xxxxx-xxxx
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelDocument'
+          description: OK
+      summary: Get One Document
+      tags:
+      - documents
+    patch:
+      description: Update One Document
+      operationId: updateOneDocument
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          example: xxxx-xxxxx-xxxxx-xxxx
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiPortsPatchDocumentRequest'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelDocument'
+          description: OK
+      summary: Update One Document
+      tags:
+      - documents
+  /documents/{id}/status-history:
+    get:
+      description: Get Document Status History
+      operationId: getDocumentStatusHistory
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          example: xxxx-xxxxx-xxxxx-xxxx
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: pageSize
+        schema:
+          type: integer
+      - in: query
+        name: sort
+        schema:
+          type: string
+          enum: [ASC, DESC]
+      - in: query
+        name: sortBy
+        schema:
+          type: string
+          enum: [createdAt]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiPortsGetManyDocumentStatusHistoriesResponse'
+          description: OK
+      summary: Get Document Status History
+      tags:
+      - documents
+components:
+  schemas:
+    ApiPortsCreateDocumentRequest:
+      properties:
+        context:
+          nullable: true
+          type: string
+        country:
+          nullable: true
+          type: string
+        customerGid:
+          type: string
+        existsInOriginalForm:
+          type: boolean
+        file:
+          $ref: '#/components/schemas/ApiPortsFileRequest'
+        gid:
+          nullable: true
+          type: string
+        isGenerated:
+          type: boolean
+          description: Indicates if the document was generated automatically
+          default: false
+        language:
+          type: string
+        name:
+          type: string
+        opportunityGid:
+          nullable: true
+          type: string
+        subtype:
+          nullable: true
+          type: string
+        type:
+          nullable: true
+          type: string
+      type: object
+    ApiPortsFileRequest:
+      properties:
+        base64:
+          nullable: true
+          type: string
+        gid:
+          nullable: true
+          type: string
+      type: object
+    ApiPortsGetManyDocumentsQuery:
+      properties:
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        sort:
+          type: string
+        sortBy:
+          type: string
+      type: object
+    ModelDocument:
+      properties:
+        context:
+          nullable: true
+          type: string
+        country:
+          type: string
+        createdAt:
+          format: date-time
+          type: string
+        createdBy:
+          $ref: '#/components/schemas/ModelUser'
+        customerGid:
+          type: string
+        existsInOriginalForm:
+          type: boolean
+        file:
+          $ref: '#/components/schemas/ModelFile'
+        gid:
+          type: string
+        isGenerated:
+          type: boolean
+          description: Indicates if the document was generated automatically
+        isSigned:
+          type: boolean
+        language:
+          type: string
+        name:
+          type: string
+        opportunityGid:
+          nullable: true
+          type: string
+        signature:
+          $ref: '#/components/schemas/ModelSignature'
+        status:
+          nullable: true
+          type: string
+        subtype:
+          nullable: true
+          type: string
+        type:
+          type: string
+        updatedAt:
+          format: date-time
+          type: string
+        updatedBy:
+          $ref: '#/components/schemas/ModelUser'
+        validityStatus:
+          type: string
+      type: object
+    ModelFile:
+      properties:
+        gid:
+          type: string
+      type: object
+    ModelSignature:
+      properties:
+        gid:
+          nullable: true
+          type: string
+        markedAsSignedBy:
+          $ref: '#/components/schemas/ModelUser'
+        type:
+          $ref: '#/components/schemas/ModelSignatureType'
+      type: object
+    ModelSignatureType:
+      enum:
+      - MANUAL
+      - DIGITAL
+      type: string
+    ModelUser:
+      properties:
+        email:
+          nullable: true
+          type: string
+        id:
+          nullable: true
+          type: string
+        source:
+          nullable: true
+          type: string
+        type:
+          type: string
+      type: object
+    ApiPortsPatchDocumentRequest:
+      properties:
+        context:
+          nullable: true
+          type: string
+        country:
+          nullable: true
+          type: string
+        customerGid:
+          nullable: true
+          type: string
+        file:
+          $ref: '#/components/schemas/ApiPortsFileRequest'
+        isGenerated:
+          type: boolean
+          description: Indicates if the document was generated automatically
+        language:
+          nullable: true
+          type: string
+        name:
+          nullable: true
+          type: string
+        opportunityGid:
+          nullable: true
+          type: string
+        subtype:
+          nullable: true
+          type: string
+        type:
+          nullable: true
+          type: string
+        validityStatus:
+          nullable: true
+          type: string
+      type: object
+    ModelDocumentStatusHistory:
+      properties:
+        documentGid:
+          type: string
+        status:
+          type: string
+        createdAt:
+          format: date-time
+          type: string
+        createdBy:
+          $ref: '#/components/schemas/ModelUser'
+      type: object
+    ApiPortsGetManyDocumentStatusHistoriesResponse:
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModelDocumentStatusHistory'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+      type: object
+    ResponseMeta:
+      properties:
+        itemsTotal:
+          type: integer
+        pagesTotal:
+          type: integer
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+      type: object
+    Pagination:
+      properties:
+        page:
+          type: integer
+        pageSize:
+          type: integer
+      type: object
+  securitySchemes:
+    BearerAuth:
+      bearerFormat: JWT
+      scheme: bearer
+      type: http
