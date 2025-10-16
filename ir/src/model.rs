@@ -89,7 +89,7 @@ pub struct Function {
     pub name: String,
     pub generics: Vec<GenericType>,
     pub params: Vec<Param>,
-    pub ret: TypeRef,
+    pub ret: Vec<TypeRef>,
     pub vis: Visibility,
     pub member_of: Option<QualifiedName>, // if a method, which type
     pub kind: FnKind,                     // Free | Static | Instance | Constructor

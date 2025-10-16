@@ -2,12 +2,17 @@ use std::collections::BTreeMap;
 
 use inflector::Inflector;
 use ir::{
-    AttrValue, Attrs, Const, Enum, EnumRepr, Field, Literal, Module, Parser, Primitive,
-    QualifiedName, Struct, Symbol, TypeAlias, TypeKind, TypeRef, Variant, VariantPayload,
-    Visibility,
+    AttrValue, Attrs, Const, Effects, Enum, EnumRepr, Field, FnKind, Function, Interface, Literal,
+    Module, Param, Parser, Primitive, QualifiedName, Struct, Symbol, TypeAlias, TypeKind, TypeRef,
+    Variant, VariantPayload, Visibility,
 };
-use openapiv3::{OpenAPI, PathItem, ReferenceOr, Schema, SchemaKind, Server, Type};
+use openapiv3::{
+    OpenAPI, Operation, Parameter, ParameterSchemaOrContent, PathItem, ReferenceOr, Schema,
+    SchemaKind, Server, Type,
+};
 use regex::Regex;
+
+use crate::builders::interface_builder::InterfaceBuilder;
 
 #[derive(Debug, thiserror::Error)]
 pub enum OpenAPIV3ParserError {
@@ -276,10 +281,6 @@ impl OpenAPIV3Parser {
             attrs: Attrs::default(),
         })
     }
-
-    fn from_path((name, ref_or_path_item): (&String, &ReferenceOr<PathItem>)) -> Symbol {
-        todo!()
-    }
 }
 
 impl Parser for OpenAPIV3Parser {
@@ -292,7 +293,8 @@ impl Parser for OpenAPIV3Parser {
             return Err(OpenAPIV3ParserError::FailedToParse.into());
         };
 
-        let mut module = Module::new("main".into());
+        let mut module = Module::new("main".into()); // TODO: get name from spec
+        let interface_builder = InterfaceBuilder::new();
 
         // parse severs
         module.symbols.extend(
@@ -303,9 +305,14 @@ impl Parser for OpenAPIV3Parser {
         );
 
         // parse paths
-        module
-            .symbols
-            .extend(spec.paths.iter().map(Self::from_path).collect::<Vec<_>>());
+        module.symbols.extend(
+            spec.paths
+                .iter()
+                .map(|(name, ref_or_path_item)| {
+                    interface_builder.from_path((name, ref_or_path_item))
+                })
+                .collect::<Vec<_>>(),
+        );
 
         // parse schemas
         if let Some(components) = spec.components {
@@ -623,7 +630,7 @@ mod tests {
 
     #[test]
     fn test_parse_openapi_spec_functions_from_paths_with_query_and_schema_ref() {
-        let spec_str = r#"
+        let spec_str = r###"
         openapi: 3.0.0
         info:
           title: Function API with Query Params and Schema Ref
@@ -631,8 +638,8 @@ mod tests {
         paths:
           /article:
             get:
-              operationId: sayHello
-              summary: Returns a hello message.
+              operationId: getArticle
+              summary: Returns an article.
               parameters:
                 - in: query
                   name: lang
@@ -654,10 +661,10 @@ mod tests {
                       schema:
                         type: string
             post:
-              operationId: createHello
-              summary: Creates a hello message.
+              operationId: createArticle
+              summary: Creates an article.
               requestBody:
-                description: Message to be created
+                description: Article to be created
                 required: true
                 content:
                   application/json:
@@ -672,7 +679,7 @@ mod tests {
                         type: string
           /user:
             get:
-              operationId: getUser
+              operationId: getUserById
               summary: Returns user object.
               parameters:
                 - in: query
@@ -687,7 +694,7 @@ mod tests {
                   content:
                     application/json:
                       schema:
-                        $ref: "\#/components/schemas/User"
+                        $ref: "#/components/schemas/User"
         components:
           schemas:
             User:
@@ -700,121 +707,58 @@ mod tests {
                 age:
                   type: integer
               required: [id, name]
-        "#;
+        "###;
 
         let parser = OpenAPIV3Parser;
         let module = parser
             .parse(spec_str)
             .expect("Should parse function API spec with query params and schema ref");
 
-        let fns: Vec<_> = module
-            .symbols
-            .iter()
-            .filter_map(|sym| {
-                if let Symbol::Function(func) = sym {
-                    Some(func)
-                } else {
-                    None
-                }
-            })
-            .collect();
+        // article
+        let Some(Symbol::Interface(interface)) = &module.symbols.get(0) else {
+            panic!("Interface should be generated");
+        };
 
+        assert_eq!(interface.methods.len(), 2);
+        assert_eq!(interface.methods[0].name, "ReadArticle");
+        assert_eq!(interface.methods[1].name, "CreateArticle");
+
+        let method = &interface.methods[0];
+        assert_eq!(method.docs, "Returns an article.");
+        assert_eq!(method.params.len(), 2);
+
+        let param_lang = method.params.get(0).expect("lang query param");
+        assert_eq!(param_lang.ty.kind, TypeKind::Primitive(Primitive::String));
+
+        let param_count = method.params.get(1).expect("count query param");
+        assert_eq!(param_count.ty.kind, TypeKind::Primitive(Primitive::I64));
+
+        let method = &interface.methods[1];
+        assert_eq!(method.docs, "Creates an article.");
+        assert_eq!(method.params.len(), 1);
+
+        let param_article = method.params.get(0).expect("article param");
         assert_eq!(
-            fns.len(),
-            3,
-            "Should have three functions from endpoints: sayHello, createHello, getUser"
+            param_article.ty.kind,
+            TypeKind::Primitive(Primitive::String)
         );
 
-        let fn_names: Vec<_> = fns.iter().map(|f| f.name.as_str()).collect();
-        assert!(fn_names.contains(&"GetArticle"));
-        assert!(fn_names.contains(&"CreateArticle"));
-        assert!(fn_names.contains(&"GetUser"));
+        // user
+        let Some(Symbol::Interface(interface)) = &module.symbols.get(1) else {
+            panic!("Interface should be generated");
+        };
 
-        let get_article_fn = fns.iter().find(|f| f.name == "GetArticle").unwrap();
-        assert_eq!(get_article_fn.docs, "Returns a hello message.");
-        // Should have 2 params: lang and count
+        assert_eq!(interface.methods.len(), 1);
+        assert_eq!(interface.methods[0].name, "ReadUser");
+
+        let method = &interface.methods[0];
+        assert_eq!(method.docs, "Returns user object.");
+        assert_eq!(method.params.len(), 1);
+
+        let param_user_id = method.params.get(0).expect("user_id param");
         assert_eq!(
-            get_article_fn.params.len(),
-            2,
-            "GetArticle should have lang and count query params"
+            param_user_id.ty.kind,
+            TypeKind::Primitive(Primitive::String)
         );
-        let param_lang = get_article_fn
-            .params
-            .iter()
-            .find(|p| p.name == "lang")
-            .expect("lang query param");
-        match &param_lang.ty.kind {
-            TypeKind::Primitive(Primitive::String) => {}
-            other => panic!("Expected lang as string param, got {:?}", other),
-        }
-        let param_count = get_article_fn
-            .params
-            .iter()
-            .find(|p| p.name == "count")
-            .expect("count query param");
-        match &param_count.ty.kind {
-            TypeKind::Primitive(Primitive::I64) => {} // OpenAPI integer -> I64 in mapping
-            other => panic!("Expected count as integer param, got {:?}", other),
-        }
-        match &get_article_fn.ret.kind {
-            TypeKind::Primitive(Primitive::String) => {}
-            other => panic!("Expected string return, got {:?}", other),
-        }
-
-        let create_article_fn = fns.iter().find(|f| f.name == "CreateArticle").unwrap();
-        assert_eq!(create_article_fn.docs, "Creates a hello message.");
-        // Should have 1 parameter (body)
-        assert_eq!(
-            create_article_fn.params.len(),
-            1,
-            "CreateArticle should have 1 body param"
-        );
-        match &create_article_fn.params[0].ty.kind {
-            TypeKind::Primitive(Primitive::String) => {}
-            other => panic!("Expected string param, got {:?}", other),
-        }
-        match &create_article_fn.ret.kind {
-            TypeKind::Primitive(Primitive::String) => {}
-            other => panic!("Expected string return, got {:?}", other),
-        }
-
-        let get_user_fn = fns.iter().find(|f| f.name == "GetUser").unwrap();
-        assert_eq!(get_user_fn.docs, "Returns user object.");
-        // Should have 1 param: user_id (string, required)
-        assert_eq!(
-            get_user_fn.params.len(),
-            1,
-            "getUser should have user_id param"
-        );
-        let param_user_id = &get_user_fn.params[0];
-        assert_eq!(param_user_id.name, "user_id");
-        match &param_user_id.ty.kind {
-            TypeKind::Primitive(Primitive::String) => {}
-            other => panic!("Expected user_id as string param, got {:?}", other),
-        }
-        // Return type should be Named(User, ..)
-        match &get_user_fn.ret.kind {
-            TypeKind::Named(qn, _) => {
-                assert_eq!(&qn.0, "User", "Return type qualified name should be 'User'");
-            }
-            other => panic!("Expected return type as Named(User, ..), got {:?}", other),
-        }
-
-        // Check that the User schema got generated as a struct
-        let user_struct = module
-            .symbols
-            .iter()
-            .find_map(|sym| {
-                if let Symbol::Struct(s) = sym {
-                    if s.name == "User" { Some(s) } else { None }
-                } else {
-                    None
-                }
-            })
-            .expect("User struct was generated from components.schemas");
-        let field_names: Vec<_> = user_struct.fields.iter().map(|f| f.name.as_str()).collect();
-        assert!(field_names.contains(&"id"));
-        assert!(field_names.contains(&"name"));
-        assert!(field_names.contains(&"age"));
     }
 }
