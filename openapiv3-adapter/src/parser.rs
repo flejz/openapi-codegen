@@ -727,21 +727,29 @@ mod tests {
         assert_eq!(method.docs, "Returns an article.");
         assert_eq!(method.params.len(), 2);
 
-        let param_lang = method.params.get(0).expect("lang query param");
-        assert_eq!(param_lang.ty.kind, TypeKind::Primitive(Primitive::String));
+        assert_eq!(
+            method.params[0].ty.kind,
+            TypeKind::Primitive(Primitive::String)
+        );
+        assert_eq!(
+            method.params[1].ty.kind,
+            TypeKind::Primitive(Primitive::I64)
+        );
 
-        let param_count = method.params.get(1).expect("count query param");
-        assert_eq!(param_count.ty.kind, TypeKind::Primitive(Primitive::I64));
+        assert_eq!(method.ret.len(), 1);
+        assert_eq!(method.ret[0].kind, TypeKind::Primitive(Primitive::String));
 
         let method = &interface.methods[1];
         assert_eq!(method.docs, "Creates an article.");
         assert_eq!(method.params.len(), 1);
 
-        let param_article = method.params.get(0).expect("article param");
         assert_eq!(
-            param_article.ty.kind,
+            method.params[0].ty.kind,
             TypeKind::Primitive(Primitive::String)
         );
+
+        assert_eq!(method.ret.len(), 1);
+        assert_eq!(method.ret[0].kind, TypeKind::Primitive(Primitive::String));
 
         // user
         let Some(Symbol::Interface(interface)) = &module.symbols.get(1) else {
@@ -755,10 +763,15 @@ mod tests {
         assert_eq!(method.docs, "Returns user object.");
         assert_eq!(method.params.len(), 1);
 
-        let param_user_id = method.params.get(0).expect("user_id param");
         assert_eq!(
-            param_user_id.ty.kind,
+            method.params[0].ty.kind,
             TypeKind::Primitive(Primitive::String)
+        );
+
+        assert_eq!(method.ret.len(), 1);
+        assert_eq!(
+            method.ret[0].kind,
+            TypeKind::Named(QualifiedName("User".to_string()), vec![])
         );
     }
 }
