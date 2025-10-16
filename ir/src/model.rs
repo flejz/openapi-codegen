@@ -6,7 +6,7 @@ pub type Attrs = BTreeMap<String, AttrValue>;
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum AttrValue {
-    Str(String),
+    String(String),
     Num(f64),
     Bool(bool),
     Seq(Vec<AttrValue>),
